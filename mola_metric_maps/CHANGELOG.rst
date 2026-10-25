@@ -2,43 +2,6 @@
 Changelog for package mola_metric_maps
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-
-3.3.1 (2026-10-05)
-------------------
-* IncrementalPointCloud: optional view-direction filter (None, MaxAngle, SurfaceSide), now enabled with SurfaceSide by default
-* KeyframePointCloudMap and IncrementalPointCloud share the same view-direction filter options and test
-* SurfaceSide filter only trusts flat neighborhoods
-* Validate the stored filter mode and drop view directions on unseen re-maps; notice base-class re-maps even after appends
-* Serialization: KFM creation options v10, IPC class v2 and creation options v4
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.0 (2026-09-23)
-------------------
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* Disable the inherited KDTreeCapable index on IncrementalPointCloud (`#224 <https://github.com/MOLAorg/mola/issues/224>`_)
-* Fix a dangling reference in the keyframe-pose test (`#225 <https://github.com/MOLAorg/mola/issues/225>`_)
-* Do not cache a covariance estimated from a thin neighborhood (`#222 <https://github.com/MOLAorg/mola/issues/222>`_)
-* Cap the negative covariance floor at the largest eigenvalue
-* Allow keeping the per-point covariance eigenvalues as found
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-* TSDF: render the actual zero level set, not the voxel centers (`#217 <https://github.com/MOLAorg/mola/issues/217>`_)
-* Merge pull request `#213 <https://github.com/MOLAorg/mola/issues/213>`_ from MOLAorg/feat/tsdf-uses-shared-hash
-  Drop TSDF's private voxel hash for the shared one
-* Read the voxel index through its members, not through a cast
-* Merge pull request `#211 <https://github.com/MOLAorg/mola/issues/211>`_ from MOLAorg/feat/tsdf-local-map
-  Add mola::TSDF, a truncated signed distance field local map
-* Expose the two constants of the per-point plane regularization (`#200 <https://github.com/MOLAorg/mola/issues/200>`_)
-* Optional diagnostic: scan-side covariance degeneracy in cov-to-cov matching (`#199 <https://github.com/MOLAorg/mola/issues/199>`_)
-* Merge pull request `#197 <https://github.com/MOLAorg/mola/issues/197>`_ from MOLAorg/feat/ndt-plane-candidates
-  NDT: report every candidate cell plane, not only the closest one
-* Guard NDT::nn_visit_pt2pl_candidates() for older mp2p_icp
-* Contributors: Jose Luis Blanco-Claraco
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge pull request `#195 <https://github.com/MOLAorg/mola/issues/195>`_ from MOLAorg/feat/cov2cov-ambiguity-gating

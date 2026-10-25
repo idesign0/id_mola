@@ -20,7 +20,6 @@
 
 #include <mola_metric_maps/MatchingDistanceProfileCompat.h>
 #include <mola_metric_maps/OptionsCapable.h>
-#include <mola_metric_maps/ViewDirectionFilter.h>
 #include <mp2p_icp/IcpPrepareCapable.h>
 #include <mp2p_icp/MetricMapMergeCapable.h>
 #include <mp2p_icp/NearestPointWithCovCapable.h>
@@ -31,7 +30,7 @@
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/maps/NearestNeighborsCapable.h>
 #include <mrpt/math/TBoundingBox.h>
-#include <mrpt/viz/viz_frwds.h>
+#include <mrpt/opengl/opengl_frwds.h>
 
 #include <functional>
 #include <map>
@@ -88,14 +87,11 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 {
   DEFINE_SERIALIZABLE(KeyframePointCloudMap, mola)
  public:
-  /** Copies take the source's internal mutex, so a map can be copied while
-   *  another thread uses it (e.g. ICP preparing its search submap). */
-  KeyframePointCloudMap(const KeyframePointCloudMap& o);
-  KeyframePointCloudMap& operator=(const KeyframePointCloudMap& o);
-
-  /** Moves are not synchronized: the source must not be in use elsewhere. */
-  KeyframePointCloudMap(KeyframePointCloudMap&&)            = default;
-  KeyframePointCloudMap& operator=(KeyframePointCloudMap&&) = default;
+  // Prevent copying and moving
+  KeyframePointCloudMap(const KeyframePointCloudMap&)            = default;
+  KeyframePointCloudMap& operator=(const KeyframePointCloudMap&) = default;
+  KeyframePointCloudMap(KeyframePointCloudMap&&)                 = default;
+  KeyframePointCloudMap& operator=(KeyframePointCloudMap&&)      = default;
 
   /** @name Basic API for construction and main parameters
    *  @{ */
@@ -249,7 +245,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   /** Returns a short description of the map. */
   std::string asString() const override;
 
-  void getVisualizationInto(mrpt::viz::CSetOfObjects& outObj) const override;
+  void getVisualizationInto(mrpt::opengl::CSetOfObjects& outObj) const override;
 
   /** Returns true if the map is empty */
   bool isEmpty() const override;
@@ -262,15 +258,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   /// Returns a cached point cloud view of the entire map.
   /// Not efficient at all. Only for MOLA->ROS2 bridge.
-  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const;
-
-#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
-  /// Makes the contents above reachable via mrpt::maps::asPointsMap().
-  [[nodiscard]] const mrpt::maps::CPointsMap* asPointsMapView() const override
-  {
-    return getAsSimplePointsMap();
-  }
-#endif
+  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const override;
 
   /** @} */
 
@@ -477,17 +465,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  in the surface, and on a ground vehicle the normal of the dominant
      *  surface is the vertical -- the axis that is already best determined.
      *  Raising this softens the assertion without changing which direction is
-     *  asserted.
-     *
-     *  Values in (0, 1] regularize as described above. A value <= 0 switches
-     *  the regularization off and keeps the eigenvalues the neighborhood
-     *  actually produced, so a sparse or rough neighborhood carries less
-     *  information than a dense flat one instead of the same amount; the
-     *  magnitude of the value is then a floor on the smaller eigenvalues,
-     *  relative to the largest one. Note that the two regimes are not on the
-     *  same scale, since kept eigenvalues carry squared metric units, so a
-     *  matching threshold or robust kernel tuned against one does not
-     *  transfer to the other.
+     *  asserted. Must be in (0, 1].
      */
     double plane_regularization_lambda = 1e-3;
 
@@ -501,16 +479,21 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  Must be < max_search_keyframes. */
     uint32_t num_diverse_keyframes = 1;
 
-    /** Master switch of the view-direction filter: if false, no pair is
-     *  rejected, whatever `view_direction_filter` says. Default: true.
+    /** If true (default), and if both the reference and query point clouds contain
+     *  per-point view-direction fields ("view_x", "view_y", "view_z" - unit vectors
+     *  pointing FROM the point TOWARD the sensor at acquisition time), then a
+     *  cov-to-cov pairing is accepted only when the angle between the two view
+     *  directions is at most `max_view_angle_deg`.
      *
-     *  The filter acts only if both the reference and query point clouds carry
-     *  per-point view-direction fields ("view_x", "view_y", "view_z": unit
-     *  vectors pointing FROM the point TOWARD the sensor at acquisition time).
-     *  Its purpose is to keep points on opposite sides of a thin surface (e.g.
-     *  a wall seen from the front vs. the back, or a thin pole), whose view
-     *  vectors are nearly anti-parallel, from being paired into a badly
-     *  conditioned or outright wrong ICP residual.
+     *  The rationale is that two points on opposite sides of a thin surface (e.g.
+     *  a wall seen from the front vs. the back, or a thin pole) will have nearly
+     *  anti-parallel view vectors.  Pairing them would produce a badly conditioned
+     *  or outright wrong ICP residual.  120° is a reasonable default: it rejects
+     *  pairs whose view directions differ by more than 120° (cos < -0.5) while
+     *  keeping pairs seen from "similar enough" directions.
+     *
+     *  Setting this to `false`, or to a threshold ≥ 180°, effectively disables
+     *  the filter even when view fields are present.
      *
      *  Contract: the "view_x/y/z" fields stored in a keyframe's point cloud
      *  (`KeyFrame::pointcloud_`) MUST be expressed in the *local KF frame*,
@@ -521,21 +504,12 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  `mp2p_icp_filters::FilterMerge`) must call the same helper to rotate
      *  the fields alongside the point coordinates, or this filter will
      *  silently compare vectors expressed in inconsistent frames.
-     *
-     *  Same option as in `IncrementalPointCloud`, so a pipeline configuring
-     *  both classes from one block of options switches both at once.
      */
     bool use_view_direction_filter = true;
 
-    /** How the view-direction filter decides, see ViewDirectionFilter.
-     *  Default: `MaxAngle` (the only mode before this option existed).
-     */
-    ViewDirectionFilter view_direction_filter = ViewDirectionFilter::MaxAngle;
-
     /** Maximum allowed angle [degrees] between the view-direction vectors of a
-     *  candidate cov-to-cov pair, for `ViewDirectionFilter::MaxAngle`. 120 deg
-     *  rejects pairs whose view directions differ by more than that
-     *  (cos < -0.5); a threshold >= 180 deg rejects nothing. Default: 120.
+     *  candidate cov-to-cov pair.  Only used when `use_view_direction_filter`
+     *  is `true` and the view fields are present.  Default: 120°.
      */
     double max_view_angle_deg = 120.0;
 
@@ -780,11 +754,11 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      * normal per-field colormap, and the result is NOT cached (used by the per-keyframe
      * debug coloring, see `MOLA_KEYFRAME_MAP_VIZ_COLOR_BY_KF`).
      */
-    std::shared_ptr<mrpt::viz::CPointCloudColoured> getViz(
+    std::shared_ptr<mrpt::opengl::CPointCloudColoured> getViz(
         const TRenderOptions&                   ro,
         const std::optional<mrpt::img::TColor>& overrideColor = std::nullopt) const;
 
-    std::shared_ptr<mrpt::viz::CSetOfObjects> getCovarianceEllipsoidViz(
+    std::shared_ptr<mrpt::opengl::CSetOfObjects> getCovarianceEllipsoidViz(
         const TRenderOptions& ro) const;
 
    private:
@@ -820,10 +794,10 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     mutable mrpt::maps::CPointsMap::Ptr pointcloud_global_;
 
     /** Cached visualization, created/getted by getViz() */
-    mutable std::shared_ptr<mrpt::viz::CPointCloudColoured> cached_viz_;
+    mutable std::shared_ptr<mrpt::opengl::CPointCloudColoured> cached_viz_;
 
     /** Cached cov visualization, created/getted by getCovarianceEllipsoidViz() */
-    mutable std::shared_ptr<mrpt::viz::CSetOfObjects> cachez_viz_covs_;
+    mutable std::shared_ptr<mrpt::opengl::CSetOfObjects> cachez_viz_covs_;
   };
 
   std::map<KeyFrameID, KeyFrame> keyframes_;

@@ -21,8 +21,6 @@
  * systems
  */
 
-#include <mola_kernel/interfaces/Dataset_UI.h>
-#include <mola_kernel/interfaces/OfflineDatasetSource.h>
 #include <mola_kernel/interfaces/RawDataSourceBase.h>
 #include <mola_launcher/MolaLauncherApp.h>
 #include <mola_yaml/yaml_helpers.h>
@@ -30,7 +28,6 @@
 #include <mrpt/core/get_env.h>
 #include <mrpt/system/CDirectoryExplorer.h>
 #include <mrpt/system/CRateTimer.h>
-#include <mrpt/system/CTicTac.h>
 #include <mrpt/system/filesystem.h>
 #include <mrpt/system/memory.h>
 #include <mrpt/system/string_utils.h>
@@ -54,12 +51,6 @@ using namespace mola;
 
 namespace
 {
-/** Length of the window used to evaluate the actual execution rate of each
- * module thread, and the minimum fraction of the desired rate below which a
- * warning is emitted. */
-constexpr double RATE_CHECK_WINDOW_SECONDS = 30.0;
-constexpr double RATE_CHECK_MIN_RATIO      = 0.8;
-
 void safe_add_to_list(const std::string& path, std::vector<std::string>& lst)
 {
   if (mrpt::system::directoryExists(path)) lst.push_back(path);
@@ -170,12 +161,6 @@ void MolaLauncherApp::shutdown()
     }
     MRPT_LOG_DEBUG("shutdown(): spin() ended.");
   }
-}
-
-void MolaLauncherApp::requestSpinExit()
-{
-  // Keep this async-signal-safe: a lock-free atomic store and nothing else.
-  threads_must_end_ = true;
 }
 
 void MolaLauncherApp::addPathModuleLibs(const std::string& path)
@@ -313,23 +298,14 @@ void MolaLauncherApp::setup(
 
       MRPT_LOG_INFO_STREAM(
           "Instantiating module `" << ds_label << "` of type `" << ds_classname << "`");
-      // Create object (needs to be registered). The class may come from a
-      // library that could not be loaded, so report those too:
-      try
-      {
-        info.impl = sectGenerator(ds_classname);
-      }
-      catch (const std::exception& e)
-      {
-        THROW_EXCEPTION_FMT("%s%s", e.what(), failed_module_libs_report().c_str());
-      }
+      // Create object (needs to be registered):
+      info.impl = sectGenerator(ds_classname);
       ASSERTMSG_(
-          info.impl,
-          mrpt::format(
-              "Error: object for module `%s` of type `%s` couldn't be "
-              "constructed from the Factory. Check class type spelling, "
-              "and whether the corresponding MOLA module is loaded.%s",
-              ds_label.c_str(), ds_classname.c_str(), failed_module_libs_report().c_str()));
+          info.impl, mrpt::format(
+                         "Error: object for module `%s` of type `%s` couldn't be "
+                         "constructed from the Factory. Check class type spelling, "
+                         "and whether the corresponding MOLA module is loaded.",
+                         ds_label.c_str(), ds_classname.c_str()));
 
       // Inherit verbosity level:
       auto verb_level = this->getMinLoggingLevel();
@@ -466,29 +442,6 @@ void MolaLauncherApp::executor_thread(InfoPerRunningThread& rds)
 
     mrpt::system::CRateTimer timer(rds.execution_rate);
 
-    // Offline dataset sources replay data at their own pace (they catch up in
-    // the next cycle), so for them the launcher rate is just a polling rate and
-    // missing it is not an actual problem. The same goes for sources with a
-    // playback UI, while they replay a recording rather than a live stream:
-    const bool isOfflineDataset =
-        dynamic_cast<const OfflineDatasetSource*>(rds.impl.get()) != nullptr;
-    const auto* datasetUI          = dynamic_cast<const Dataset_UI*>(rds.impl.get());
-    const auto  checkExecutionRate = [&]()
-    {
-      if (isOfflineDataset)
-      {
-        return false;
-      }
-      return datasetUI == nullptr || !datasetUI->datasetUI_enabled();
-    };
-
-    // Rate monitoring: an isolated late cycle is normal (e.g. a one-off costly
-    // operation), only a sustained rate loss is worth reporting to the user:
-    mrpt::system::CTicTac rateWindowTimer;
-    size_t                rateWindowCycles = 0;
-    size_t                rateWindowLate   = 0;
-    rateWindowTimer.Tic();
-
     while (!threads_must_end_ && !rds.this_thread_must_end && !rds.impl->requestedShutdown())
     {
       // Only if all modules are correctly initialized:
@@ -500,42 +453,10 @@ void MolaLauncherApp::executor_thread(InfoPerRunningThread& rds)
 
       // Done, cycle:
       const bool ontime = timer.sleep();
-
-      if (!checkExecutionRate())
-      {
-        // Restart the window, so it only spans cycles that are monitored:
-        rateWindowCycles = 0;
-        rateWindowLate   = 0;
-        rateWindowTimer.Tic();
-        continue;
-      }
-
-      rateWindowCycles++;
       if (!ontime)
-      {
-        rateWindowLate++;
-      }
-
-      const double windowTime = rateWindowTimer.Tac();
-      if (windowTime < RATE_CHECK_WINDOW_SECONDS)
-      {
-        continue;
-      }
-
-      const double achievedRate = rateWindowCycles / windowTime;
-      if (achievedRate < RATE_CHECK_MIN_RATIO * rds.execution_rate)
-      {
-        MRPT_LOG_WARN_FMT(
-            "Could not achieve desired execution rate on thread for module "
-            "named `%s`: %.01f Hz achieved vs %.01f Hz desired (%zu late "
-            "cycles out of %zu in the last %.01f s).",
-            rds.name.c_str(), achievedRate, rds.execution_rate, rateWindowLate, rateWindowCycles,
-            windowTime);
-      }
-
-      rateWindowCycles = 0;
-      rateWindowLate   = 0;
-      rateWindowTimer.Tic();
+        MRPT_LOG_THROTTLE_WARN_STREAM(
+            30.0, "Could not achieve desired real-time execution rate ("
+                      << rds.execution_rate << " Hz) on thread for sensor named: " << rds.name);
     };
 
     // Give the module an opportunity to do any extra household tasks before

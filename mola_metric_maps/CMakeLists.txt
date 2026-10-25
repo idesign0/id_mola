@@ -22,14 +22,10 @@ find_package(mola_common REQUIRED)
 
 # find CMake dependencies:
 find_package(mola_kernel REQUIRED)
-find_package(mrpt_maps REQUIRED)
-find_package(mrpt_viz REQUIRED)
+find_package(mrpt-maps REQUIRED)
 find_package(mp2p_icp_map REQUIRED)
-find_package(Eigen3 REQUIRED NO_MODULE)
 
 find_package(TBB) # optional
-
-find_package(mola_test_datasets QUIET) # optional (for testing builds only)
 
 if(TBB_FOUND)
   option(MOLA_METRIC_MAPS_USE_TBB "If found TBB, this option controls whether to use it or not" ON)
@@ -83,7 +79,6 @@ set(LIB_SRCS
   src/register.cpp
   src/SparseTreesPointCloud.cpp
   src/SparseVoxelPointCloud.cpp
-  src/TSDF.cpp
 )
 set(LIB_PUBLIC_HDRS
   include/mola_metric_maps/FixedDenseGrid3D.h
@@ -96,8 +91,6 @@ set(LIB_PUBLIC_HDRS
   include/mola_metric_maps/OptionsIniIO.h
   include/mola_metric_maps/SparseTreesPointCloud.h
   include/mola_metric_maps/SparseVoxelPointCloud.h
-  include/mola_metric_maps/TSDF.h
-  include/mola_metric_maps/ViewDirectionFilter.h
 )
 
 # The map class is always built; only the k-d tree backend is conditional (see
@@ -115,17 +108,13 @@ mola_add_library(
   TARGET ${PROJECT_NAME}
   SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
   PUBLIC_LINK_LIBRARIES
-    mrpt::mrpt_maps
-    mrpt::mrpt_viz
+    mrpt::maps
     tsl::robin_map
     mola::mola_kernel
     mola::mp2p_icp_map
-  PRIVATE_LINK_LIBRARIES
-    Eigen3::Eigen
   CMAKE_DEPENDENCIES
     mola_kernel
-    mrpt_maps
-    mrpt_viz
+    mrpt-maps
     mp2p_icp_map
     robin_map
 )

@@ -26,12 +26,10 @@
 #include <mrpt/obs/CObservation3DRangeScan.h>
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/obs/CObservationVelodyneScan.h>
+#include <mrpt/opengl/CPointCloud.h>
+#include <mrpt/opengl/CPointCloudColoured.h>
 #include <mrpt/serialization/CArchive.h>  // serialization
 #include <mrpt/system/os.h>
-#include <mrpt/viz/CBox.h>
-#include <mrpt/viz/CPointCloud.h>
-#include <mrpt/viz/CPointCloudColoured.h>
-#include <mrpt/viz/CSetOfObjects.h>
 
 #include <cmath>
 
@@ -222,7 +220,7 @@ std::string SparseVoxelPointCloud::asString() const
       boundingBox().asString().c_str());
 }
 
-void SparseVoxelPointCloud::getVisualizationInto(mrpt::viz::CSetOfObjects& outObj) const
+void SparseVoxelPointCloud::getVisualizationInto(mrpt::opengl::CSetOfObjects& outObj) const
 {
   MRPT_START
   if (!genericMapParams.enableSaveAs3DObject)
@@ -233,7 +231,7 @@ void SparseVoxelPointCloud::getVisualizationInto(mrpt::viz::CSetOfObjects& outOb
   if (renderOptions.colormap == mrpt::img::cmNONE)
   {
     // Single color:
-    auto obj = mrpt::viz::CPointCloud::Create();
+    auto obj = mrpt::opengl::CPointCloud::Create();
 
     if (renderOptions.show_mean_only)
     {
@@ -260,7 +258,7 @@ void SparseVoxelPointCloud::getVisualizationInto(mrpt::viz::CSetOfObjects& outOb
   }
   else
   {
-    auto obj = mrpt::viz::CPointCloudColoured::Create();
+    auto obj = mrpt::opengl::CPointCloudColoured::Create();
 
     auto bb = this->boundingBox();
 
@@ -341,7 +339,7 @@ void SparseVoxelPointCloud::getVisualizationInto(mrpt::viz::CSetOfObjects& outOb
     {
       const mrpt::math::TPoint3Df voxelCenter = globalIdxToCoord(idxs);
 
-      auto glBox = mrpt::viz::CBox::Create();
+      auto glBox = mrpt::opengl::CBox::Create();
       glBox->setWireframe(true);
       glBox->setBoxCorners(
           (voxelCenter - halfVoxel_).cast<double>(),

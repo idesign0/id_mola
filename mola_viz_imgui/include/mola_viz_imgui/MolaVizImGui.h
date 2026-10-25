@@ -69,7 +69,6 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   // ExecutableBase
   void initialize(const Yaml& cfg) override;
   void spinOnce() override;
-  void onQuit() override;
 
   // =========================================================================
   /** @name mola-viz-imgui main API
@@ -160,7 +159,7 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
    * @{ */
 
   std::future<bool> update_3d_object(
-      const std::string& objName, const std::shared_ptr<mrpt::viz::CSetOfObjects>& obj,
+      const std::string& objName, const std::shared_ptr<mrpt::opengl::CSetOfObjects>& obj,
       const std::string& viewportName = "main",
       const std::string& parentWindow = DEFAULT_WINDOW_NAME,
       const std::string& parentFrame  = "") override
@@ -177,7 +176,7 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   }
 
   std::future<bool> insert_point_cloud_with_decay(
-      const std::shared_ptr<mrpt::viz::CPointCloudColoured>& cloud, double decay_time_seconds,
+      const std::shared_ptr<mrpt::opengl::CPointCloudColoured>& cloud, double decay_time_seconds,
       const std::string& viewportName = "main",
       const std::string& parentWindow = DEFAULT_WINDOW_NAME,
       const std::string& parentFrame  = "") override
@@ -218,8 +217,8 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   }
 
   std::future<bool> execute_custom_code_on_background_scene(
-      const std::function<void(mrpt::viz::Scene&)>& userCode,
-      const std::string&                            parentWindow = DEFAULT_WINDOW_NAME) override
+      const std::function<void(mrpt::opengl::Scene&)>& userCode,
+      const std::string&                               parentWindow = DEFAULT_WINDOW_NAME) override
   {
     return core_ptr_->execute_custom_code_on_background_scene(userCode, parentWindow);
   }
@@ -294,9 +293,6 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   // ---------------------------------------------------------------------------
   // GUI thread (host mode only)
   // ---------------------------------------------------------------------------
-  // Ends and joins the GUI thread, releasing its GL resources:
-  void stop_gui_thread();
-
   std::thread       guiThread_;
   std::atomic<bool> guiThreadShutdown_{false};
   ImGuiContext*     imgui_ctx_  = nullptr;

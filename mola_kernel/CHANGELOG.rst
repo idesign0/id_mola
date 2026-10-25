@@ -2,26 +2,6 @@
 Changelog for package mola_kernel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-
-3.3.1 (2026-10-05)
-------------------
-* Dataset_UI: add datasetUI_enabled() so sources can opt out of the playback panel at runtime
-* Viz: measure GUI frame intervals with a steady clock
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.0 (2026-09-23)
-------------------
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-* mola_viz_imgui: show "???" for an unknown dataset duration (`#203 <https://github.com/MOLAorg/mola/issues/203>`_)
-* mola_viz_imgui: show dataset playback time in the dataset UI panel (`#202 <https://github.com/MOLAorg/mola/issues/202>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge pull request `#192 <https://github.com/MOLAorg/mola/issues/192>`_ from MOLAorg/feat/map-frame-gauge-change

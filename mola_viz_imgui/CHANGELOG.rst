@@ -2,32 +2,6 @@
 Changelog for package mola_viz_imgui
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-* Use MRPT's vendored Dear ImGui and render the background scene directly (mrpt_imgui_vendor is optional).
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.1 (2026-10-05)
-------------------
-* Define GLFW_INCLUDE_NONE before including GLFW (fixes `#239 <https://github.com/MOLAorg/mola/issues/239>`_)
-* Dataset_UI: skip sources that report datasetUI_enabled() false, polling them again later
-* Lidar sensor preview windows: add combo to pick the field used for recoloring
-* Do not re-upload unchanged decaying clouds nor rebuild sensor preview clouds every frame
-* Profile GUI frame time and frame interval
-* Viz: measure GUI frame intervals with a steady clock
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.0 (2026-09-23)
-------------------
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-* mola_viz_imgui: show "???" for an unknown dataset duration (`#203 <https://github.com/MOLAorg/mola/issues/203>`_)
-* mola_viz_imgui: show dataset playback time in the dataset UI panel (`#202 <https://github.com/MOLAorg/mola/issues/202>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
 3.2.0 (2026-08-21)
 ------------------
 * Fix mola_viz_imgui GUI rendering nothing depending on link order

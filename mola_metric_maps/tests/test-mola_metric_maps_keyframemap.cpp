@@ -23,10 +23,10 @@
 #include <mrpt/io/CMemoryStream.h>
 #include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/obs/CObservationPointCloud.h>
+#include <mrpt/opengl/CPointCloudColoured.h>
+#include <mrpt/opengl/CSetOfObjects.h>
 #include <mrpt/poses/CPose3D.h>
 #include <mrpt/serialization/CArchive.h>
-#include <mrpt/viz/CPointCloudColoured.h>
-#include <mrpt/viz/CSetOfObjects.h>
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +34,6 @@
 #include <iostream>
 #include <numeric>
 #include <set>
-#include <thread>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,21 +122,6 @@ mola::KeyframePointCloudMap makeMapFromCloud(
 // Tests
 // ---------------------------------------------------------------------------
 
-// Through a CMetricMap reference, the contents are reachable as points
-// (e.g. for the ROS 2 bridge):
-void test_as_points_map()
-{
-#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
-  const auto                        pts = makeGridPts();
-  const mola::KeyframePointCloudMap m   = makeMapFromCloud(makeCloudWithViews(pts));
-
-  const mrpt::maps::CMetricMap& asMetricMap = m;
-  const auto*                   view        = mrpt::maps::asPointsMap(asMetricMap);
-  ASSERT_(view != nullptr);
-  ASSERT_EQUAL_(view->size(), pts.size());
-#endif
-}
-
 // ── 1. Basic map lifecycle ──────────────────────────────────────────────────
 void test_basic_ops()
 {
@@ -158,65 +142,6 @@ void test_basic_ops()
 
   const std::string s = m.asString();
   ASSERT_(!s.empty());
-}
-
-// ── 1b. Copies are complete, and safe while ICP prepares the map ──────────
-void test_copy_while_preparing_icp()
-{
-  mola::KeyframePointCloudMap m;
-  m.creationOptions.k_correspondences_for_cov = 5;
-  m.creationOptions.max_search_keyframes      = 2;
-
-  const int numKFs = 8;
-  for (int kf = 0; kf < numKFs; ++kf)
-  {
-    auto obs        = mrpt::obs::CObservationPointCloud::Create();
-    obs->pointcloud = makeCloudWithViews(makeGridPts());
-    m.insertObservation(*obs, mrpt::poses::CPose3D::FromTranslation(kf * 10.0, 0, 0));
-  }
-
-  {
-    const mola::KeyframePointCloudMap c = m;
-    ASSERT_EQUAL_(c.point_count(), m.point_count());
-    ASSERT_EQUAL_(c.nextFreeKeyFrameID_public(), m.nextFreeKeyFrameID_public());
-    ASSERT_EQUAL_(c.creationOptions.max_search_keyframes, m.creationOptions.max_search_keyframes);
-  }
-
-  // One thread keeps rebuilding the ICP search submap at alternating poses,
-  // as ICP does, while another one copies the map (as a GUI render would).
-  // Run under TSan to check for data races.
-  const int   numIters = 200;
-  std::thread icpThread(
-      [&]()
-      {
-        for (int i = 0; i < numIters; i++)
-        {
-          const double x = (i % 2 == 0) ? 0.0 : (numKFs - 1) * 10.0;
-          m.icp_get_prepared_as_global(mrpt::poses::CPose3D::FromTranslation(x, 0, 0));
-        }
-      });
-
-  // Joins the thread even if an assertion below throws:
-  struct JoinGuard
-  {
-    std::thread& t;
-    ~JoinGuard()
-    {
-      if (t.joinable())
-      {
-        t.join();
-      }
-    }
-  } joinGuard{icpThread};
-
-  for (int i = 0; i < numIters; i++)
-  {
-    const auto c = std::dynamic_pointer_cast<mola::KeyframePointCloudMap>(m.duplicateGetSmartPtr());
-    ASSERT_(c);
-    ASSERT_EQUAL_(c->point_count(), m.point_count());
-    const auto bb = m.boundingBox();
-    ASSERT_GT_(bb.max.x, bb.min.x);
-  }
 }
 
 // ── 2. clear() empties the map ─────────────────────────────────────────────
@@ -286,7 +211,6 @@ void test_creation_options_roundtrip()
 {
   mola::KeyframePointCloudMap m;
   m.creationOptions.use_view_direction_filter = false;
-  m.creationOptions.view_direction_filter     = mola::ViewDirectionFilter::SurfaceSide;
   m.creationOptions.max_view_angle_deg        = 75.0;
   m.creationOptions.k_correspondences_for_cov = 12;
   m.creationOptions.max_search_keyframes      = 4;
@@ -307,13 +231,7 @@ void test_creation_options_roundtrip()
   }
 
   ASSERT_EQUAL_(m2.creationOptions.use_view_direction_filter, false);
-  ASSERT_(m2.creationOptions.view_direction_filter == mola::ViewDirectionFilter::SurfaceSide);
   ASSERT_NEAR_(m2.creationOptions.max_view_angle_deg, 75.0, 1e-9);
-
-  // A default map keeps the angle test, the only one before the mode existed:
-  ASSERT_(
-      mola::KeyframePointCloudMap::TCreationOptions().view_direction_filter ==
-      mola::ViewDirectionFilter::MaxAngle);
   ASSERT_EQUAL_(m2.creationOptions.k_correspondences_for_cov, 12U);
   ASSERT_EQUAL_(m2.creationOptions.max_search_keyframes, 4U);
   ASSERT_NEAR_(m2.creationOptions.rotation_distance_weight, 3.5, 1e-9);
@@ -560,55 +478,6 @@ void test_view_filter_rejects_opposite_view_pairs()
     global_m.nn_search_cov2cov(local_m, mrpt::poses::CPose3D::Identity(), kMaxDist, pairings);
     // All 32 pairs pass
     ASSERT_EQUAL_(pairings.size(), totalPts);
-  }
-}
-
-// ── View filter: SurfaceSide mode, in both cov2cov paths ──────────────────
-// Ground seen at a low elevation from opposite azimuths is the same face of the
-// surface: the angle test rejects it (140 deg apart), the surface-side test must
-// not. The two faces of a surface must be rejected by both.
-void test_view_filter_surface_side()
-{
-  constexpr float kDz      = 0.02f;
-  constexpr float kMaxDist = 1.0f;
-
-  const float cElev = std::cos(mrpt::DEG2RAD(20.0f));
-  const float sElev = std::sin(mrpt::DEG2RAD(20.0f));
-
-  for (const bool approximate : {false, true})
-  {
-    const auto lambdaPairings = [&](float vxQuery, float vzQuery, mola::ViewDirectionFilter mode)
-    {
-      // The grid is 1 m apart: a plane fit needs a wider neighborhood than the
-      // default, or the covariance falls back to isotropic, which never
-      // rejects. Set before inserting, since keyframes cache their covariances.
-      mola::KeyframePointCloudMap global_m;
-      global_m.creationOptions.k_correspondences_for_cov = 5;
-      global_m.creationOptions.max_search_keyframes      = 1;
-      global_m.creationOptions.max_distance_for_cov      = 3.0;
-      global_m.creationOptions.view_direction_filter     = mode;
-      global_m.creationOptions.approximate_cov           = approximate;
-      {
-        mrpt::obs::CObservationPointCloud obs;
-        obs.pointcloud = makeCloudWithViews(makeGridPts(0.f, cElev, 0.f, sElev));
-        global_m.insertObservation(obs, mrpt::poses::CPose3D::Identity());
-      }
-      auto local_m = makeMapFromCloud(makeCloudWithViews(makeGridPts(kDz, vxQuery, 0.f, vzQuery)));
-      global_m.icp_get_prepared_as_global(mrpt::poses::CPose3D::Identity());
-
-      mp2p_icp::MatchedPointWithCovList pairings;
-      global_m.nn_search_cov2cov(local_m, mrpt::poses::CPose3D::Identity(), kMaxDist, pairings);
-      return pairings.size();
-    };
-    const size_t nPts = makeGridPts().size();
-
-    // Same face, opposite azimuths:
-    ASSERT_EQUAL_(lambdaPairings(-cElev, sElev, mola::ViewDirectionFilter::MaxAngle), 0U);
-    ASSERT_EQUAL_(lambdaPairings(-cElev, sElev, mola::ViewDirectionFilter::SurfaceSide), nPts);
-    ASSERT_EQUAL_(lambdaPairings(-cElev, sElev, mola::ViewDirectionFilter::None), nPts);
-
-    // Opposite faces:
-    ASSERT_EQUAL_(lambdaPairings(0.f, -1.f, mola::ViewDirectionFilter::SurfaceSide), 0U);
   }
 }
 
@@ -924,9 +793,8 @@ void test_kf_pose_plumbing()
     const auto next = m.nextFreeKeyFrameID_public();
     ASSERT_EQUAL_(next, static_cast<KFID>(i));
     m.insertObservation(*obs, seedPoses[i]);
-    const auto lastId = m.lastInsertedKeyFrameID();
-    ASSERT_(lastId.has_value());
-    ASSERT_EQUAL_(*lastId, static_cast<KFID>(i));
+    ASSERT_(m.lastInsertedKeyFrameID().has_value());
+    ASSERT_EQUAL_(*m.lastInsertedKeyFrameID(), static_cast<KFID>(i));
   }
 
   // keyframePoses returns a snapshot keyed by id.
@@ -939,12 +807,7 @@ void test_kf_pose_plumbing()
 
   // Mutating the snapshot does not affect the map.
   snap.at(KFID{0}) = CPose3D::FromXYZYawPitchRoll(99.0, 0.0, 0.0, 0.0_deg, 0.0_deg, 0.0_deg);
-  // Note the named local: keyframePoses() returns the snapshot by value, and
-  // ASSERT_NEAR_() binds its argument to a `const auto&`. Reading through the
-  // temporary would leave that reference dangling, since x() hands out a
-  // reference into a map that dies with the enclosing declaration.
-  const auto refetched = m.keyframePoses();
-  ASSERT_NEAR_(refetched.at(KFID{0}).x(), 0.0, 1e-9);
+  ASSERT_NEAR_(m.keyframePoses().at(KFID{0}).x(), 0.0, 1e-9);
 
   // setKeyframePose updates the stored pose.
   const auto newPose1 = CPose3D::FromXYZYawPitchRoll(2.0, 0.0, 1.5, 0.0_deg, 5.0_deg, 0.0_deg);
@@ -952,7 +815,8 @@ void test_kf_pose_plumbing()
   const auto poseAfter = m.keyframePoses().at(KFID{1});
   ASSERT_NEAR_(poseAfter.x(), newPose1.x(), 1e-9);
   ASSERT_NEAR_(poseAfter.z(), newPose1.z(), 1e-9);
-  const auto [y, p, r] = poseAfter.getYawPitchRoll();
+  double y, p, r;
+  poseAfter.getYawPitchRoll(y, p, r);
   ASSERT_NEAR_(p, 5.0_deg, 1e-9);
 
   // setKeyframePose on a missing id is a no-op (does not throw, does not add).
@@ -973,9 +837,8 @@ void test_kf_pose_plumbing()
   const auto poseNear = CPose3D::FromXYZYawPitchRoll(5.0, 0.0, 0.0, 0.0_deg, 0.0_deg, 0.0_deg);
   m.insertObservation(*obs, poseNear);
 
-  const auto lastIdAfterEviction = m.lastInsertedKeyFrameID();
-  ASSERT_(lastIdAfterEviction.has_value());
-  ASSERT_EQUAL_(*lastIdAfterEviction, KFID{3});
+  ASSERT_(m.lastInsertedKeyFrameID().has_value());
+  ASSERT_EQUAL_(*m.lastInsertedKeyFrameID(), KFID{3});
 
   // drainEvictedKeyFrameIDs returns the ids of KFs dropped during the
   // last insertion(s), then clears its internal list.
@@ -1329,7 +1192,7 @@ void test_viz_color_by_kf()
   size_t             cloudObjs = 0;
   for (const auto& child : *glObj)
   {
-    auto pc = std::dynamic_pointer_cast<mrpt::viz::CPointCloudColoured>(child);
+    auto pc = std::dynamic_pointer_cast<mrpt::opengl::CPointCloudColoured>(child);
     if (!pc || pc->size() == 0)
     {
       continue;
@@ -1644,12 +1507,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
     std::cout << "test_basic_ops ...\n";
     test_basic_ops();
 
-    std::cout << "test_as_points_map ...\n";
-    test_as_points_map();
-
-    std::cout << "test_copy_while_preparing_icp ...\n";
-    test_copy_while_preparing_icp();
-
     std::cout << "test_clear ...\n";
     test_clear();
 
@@ -1682,7 +1539,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
     std::cout << "test_view_filter_rejects_opposite_view_pairs ...\n";
     test_view_filter_rejects_opposite_view_pairs();
-    test_view_filter_surface_side();
 
     std::cout << "test_view_filter_accepts_aligned_views ...\n";
     test_view_filter_accepts_aligned_views();

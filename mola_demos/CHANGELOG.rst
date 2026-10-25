@@ -2,20 +2,6 @@
 Changelog for package mola_demos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-* fake_sensor_publisher: publish the ground-truth trail as nav_msgs/Path (parameter gt_path_topic).
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.1 (2026-10-05)
-------------------
-
-3.3.0 (2026-09-23)
-------------------
-
-3.2.1 (2026-09-15)
-------------------
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge remote-tracking branch 'origin/feat/map-frame-gauge-change' into feat/map-frame-gauge-change

@@ -21,9 +21,6 @@
  * C++ library for the Dear ImGui MOLA GUI backend
  */
 
-// GL headers come from mrpt/opengl/opengl_api.h, which must define
-// GL_GLEXT_PROTOTYPES before GL/gl.h is first seen.
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -36,13 +33,7 @@
 #include <mrpt/system/string_utils.h>
 #include <mrpt/system/thread_name.h>
 
-#include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <optional>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 using namespace mola;
@@ -110,30 +101,14 @@ MolaVizImGui::MolaVizImGui()
 
 MolaVizImGui::~MolaVizImGui()
 {
-  stop_gui_thread();
+  if (!embed_mode_)
+  {
+    guiThreadShutdown_.store(true);
+    if (guiThread_.joinable()) guiThread_.join();
+  }
 
   std::lock_guard lk(instanceMtx_);
   instance_ = nullptr;
-}
-
-void MolaVizImGui::stop_gui_thread()
-{
-  if (embed_mode_)
-  {
-    return;
-  }
-  guiThreadShutdown_.store(true);
-  if (guiThread_.joinable())
-  {
-    guiThread_.join();
-  }
-}
-
-void MolaVizImGui::onQuit()
-{
-  // Other modules may keep a reference to this one, so its destructor may run
-  // too late (or never), once static GUI state is being destroyed at exit.
-  stop_gui_thread();
 }
 
 // ---------------------------------------------------------------------------
@@ -164,22 +139,6 @@ void MolaVizImGui::initialize(const Yaml& c)
       cfg.getOrDefault("assumed_sensor_rate_hz", core_ptr_->assumed_sensor_rate_hz_);
   core_ptr_->target_fps_     = cfg.getOrDefault("target_fps", core_ptr_->target_fps_);
   core_ptr_->imgui_app_name_ = cfg.getOrDefault("imgui_app_name", core_ptr_->imgui_app_name_);
-
-  // The environment overrides the YAML, so the GUI refresh rate (the main
-  // driver of its CPU/GPU load) can be tuned without editing launch files.
-  if (const char* env_fps = std::getenv("MOLA_GUI_TARGET_FPS"); env_fps && *env_fps)
-  {
-    const int fps = std::atoi(env_fps);
-    if (fps > 0)
-    {
-      core_ptr_->target_fps_ = fps;
-    }
-    else
-    {
-      MRPT_LOG_WARN_STREAM("Ignoring invalid MOLA_GUI_TARGET_FPS='" << env_fps << "'");
-    }
-  }
-  MRPT_LOG_DEBUG_STREAM("MolaVizImGui: target_fps=" << core_ptr_->target_fps_);
 
   core_ptr_->console_enabled_ = cfg.getOrDefault("console_enabled", core_ptr_->console_enabled_);
   core_ptr_->console_max_entries_ =
@@ -333,22 +292,9 @@ void MolaVizImGui::gui_thread()
 
   const double frame_period = 1.0 / static_cast<double>(std::max(1, core_ptr_->target_fps_));
 
-  // Elapsed time between consecutive frame starts: what the user perceives
-  // as GUI (un)responsiveness. Reported by the profiler (mola-cli -p).
-  // Measured with a steady clock, since mrpt::Clock may follow simulated time.
-  std::optional<std::chrono::steady_clock::time_point> last_frame_start;
-
   while (!guiThreadShutdown_.load())
   {
-    const double t0          = mrpt::Clock::nowDouble();
-    const auto   frame_start = std::chrono::steady_clock::now();
-    if (last_frame_start && profiler_.isEnabled())
-    {
-      profiler_.registerUserMeasure(
-          "gui_thread.frame_interval",
-          std::chrono::duration<double>(frame_start - *last_frame_start).count());
-    }
-    last_frame_start = frame_start;
+    const double t0 = mrpt::Clock::nowDouble();
 
     glfwPollEvents();
 
@@ -357,16 +303,10 @@ void MolaVizImGui::gui_thread()
       if (wd.glfw_window && !glfwWindowShouldClose(wd.glfw_window)) any_open = true;
     if (!any_open) break;
 
+    for (auto& [name, wd] : core_ptr_->windows_)
     {
-      const ProfilerEntry tle(profiler_, "gui_thread.render_frame");
-      for (auto& [name, wd] : core_ptr_->windows_)
-      {
-        if (!wd.glfw_window || glfwWindowShouldClose(wd.glfw_window))
-        {
-          continue;
-        }
-        core_ptr_->render_frame(name, wd);
-      }
+      if (!wd.glfw_window || glfwWindowShouldClose(wd.glfw_window)) continue;
+      core_ptr_->render_frame(name, wd);
     }
 
     const double elapsed = mrpt::Clock::nowDouble() - t0;
@@ -409,29 +349,6 @@ void MolaVizImGui::gui_thread()
 // Dataset UI
 // ---------------------------------------------------------------------------
 
-namespace
-{
-/** Compact "[h:]mm:ss.s" rendering of a time interval, for the dataset
- *  playback panel. */
-std::string format_playback_time(double t)
-{
-  if (t < 0 || !std::isfinite(t))
-  {
-    t = 0;
-  }
-  const auto   totalSecs = static_cast<uint64_t>(t);
-  const auto   hours     = static_cast<unsigned int>(totalSecs / 3600);
-  const auto   mins      = static_cast<unsigned int>((totalSecs / 60) % 60);
-  const double secs      = t - static_cast<double>(hours * 3600 + mins * 60);
-
-  if (hours > 0)
-  {
-    return mrpt::format("%u:%02u:%04.1f", hours, mins, secs);
-  }
-  return mrpt::format("%u:%04.1f", mins, secs);
-}
-}  // namespace
-
 void MolaVizImGui::dataset_ui_check_new_modules()
 {
   auto datasetUIs = findService<Dataset_UI>();
@@ -439,12 +356,6 @@ void MolaVizImGui::dataset_ui_check_new_modules()
   {
     const auto modUI = std::dynamic_pointer_cast<Dataset_UI>(module);
     ASSERT_(modUI);
-
-    // Not an offline dataset (yet): check again on the next call.
-    if (!modUI->datasetUI_enabled())
-    {
-      continue;
-    }
 
     auto& e = datasetUIs_[module->getModuleInstanceName()];
     if (!e.first_time_seen) continue;
@@ -475,7 +386,7 @@ void MolaVizImGui::dataset_ui_check_new_modules()
     mola::gui::WindowDescription desc;
     desc.title               = module->getModuleInstanceName();
     desc.position            = {300, 5};
-    desc.size                = {800, 70};
+    desc.size                = {650, 70};
     desc.dock_top_by_default = true;
 
     mola::gui::Tab tab{"Controls", {}};
@@ -538,19 +449,7 @@ void MolaVizImGui::dataset_ui_update()
     if (!mod || !e.lbPlaybackPosition) continue;
     const size_t pos = mod->datasetUI_lastQueriedTimestep();
     const size_t N   = mod->datasetUI_size();
-
-    std::string txt = mrpt::format("%zu / %zu", pos, N);
-
-    // Dataset playback time, if the source can tell it. The total duration
-    // may be unknown even if the current time is known:
-    if (const auto t = mod->datasetUI_time(); t.has_value())
-    {
-      const auto T = mod->datasetUI_total_time();
-      txt += "  |  " + format_playback_time(*t) + " / " +
-             (T.has_value() ? format_playback_time(*T) : std::string("???"));
-    }
-
-    e.lbPlaybackPosition->set(txt);
+    e.lbPlaybackPosition->set(mrpt::format("%zu / %zu", pos, N));
     if (e.liveSliderPos) e.liveSliderPos->set(static_cast<float>(pos));
   }
 }

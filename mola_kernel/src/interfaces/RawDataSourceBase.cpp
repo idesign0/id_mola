@@ -221,7 +221,7 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
         {
           ProfilerEntry pe(profiler_, "send to viz lambda");
 
-          using namespace mrpt::viz;
+          using namespace mrpt::opengl;
 
           // GUI update decimation:
           if (++sv->decimation_counter < sv->decimation)

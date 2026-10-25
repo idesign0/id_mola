@@ -14,12 +14,10 @@ project(mola_viz_imgui LANGUAGES CXX)
 find_package(mola_common REQUIRED)
 
 # -- External dependencies ----------------------------------------------------
-find_package(mrpt_maps    REQUIRED)
-find_package(mrpt_opengl  REQUIRED)
-find_package(mrpt_obs     REQUIRED)
-find_package(mrpt_gui     REQUIRED)
-find_package(mrpt_viz     REQUIRED)
-find_package(mrpt_imgui   REQUIRED)
+find_package(mrpt-maps    REQUIRED)
+find_package(mrpt-opengl  REQUIRED)
+find_package(mrpt-obs     REQUIRED)
+find_package(mrpt-gui     REQUIRED)
 find_mola_package(mola_kernel)
 
 # GLFW is needed explicitly for our own GLFW window management.
@@ -34,19 +32,7 @@ find_package(OpenGL REQUIRED)
 # The helper CMakeLists that builds it as a static lib lives at:
 #   3rdparty/imgui_static/CMakeLists.txt
 #
-# Dear ImGui + ImPlot: use MRPT's vendored copy if available (MRPT >= 3.3),
-# so all MRPT-based GUIs in one process share it. Otherwise, build the
-# submodules in 3rdparty/. Both define the imgui::imgui target.
-# Not in package.xml on purpose, so dependency resolution does not require it.
-find_package(mrpt_imgui_vendor QUIET)
-if(mrpt_imgui_vendor_FOUND)
-  message(STATUS "mola_viz_imgui: using Dear ImGui from mrpt_imgui_vendor")
-  set(IMGUI_CMAKE_DEPENDENCY mrpt_imgui_vendor)
-else()
-  message(STATUS "mola_viz_imgui: using Dear ImGui from 3rdparty/ submodules")
-  add_subdirectory(3rdparty/imgui_static imgui_static_build)
-  set(IMGUI_CMAKE_DEPENDENCY "")
-endif()
+add_subdirectory(3rdparty/imgui_static imgui_static_build)
 # After this, the target  imgui::imgui  is available.
 
 # -- Module sources -----------------------------------------------------------
@@ -68,24 +54,19 @@ mola_add_library(
   SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
   PUBLIC_LINK_LIBRARIES
     mola::mola_kernel
-    mrpt::mrpt_opengl
-    mrpt::mrpt_maps
-    mrpt::mrpt_obs
-    mrpt::mrpt_viz
+    mrpt::opengl
+    mrpt::maps
+    mrpt::obs
     OpenGL::GL
-    mrpt::mrpt_gui
-    mrpt::mrpt_imgui   # public header includes mrpt/imgui/CImGuiSceneView.h
+    mrpt::gui          # public header includes mrpt/imgui/CImGuiSceneView.h
   PRIVATE_LINK_LIBRARIES
     imgui::imgui
   CMAKE_DEPENDENCIES
     mola_kernel
-    mrpt_opengl
-    mrpt_maps
-    mrpt_obs
-    mrpt_gui
-    mrpt_imgui
-    mrpt_viz
-    ${IMGUI_CMAKE_DEPENDENCY}
+    mrpt-opengl
+    mrpt-maps
+    mrpt-obs
+    mrpt-gui
 )
 
 # -- Compiler options ---------------------------------------------------------

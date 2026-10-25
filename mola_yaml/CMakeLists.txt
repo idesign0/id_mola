@@ -17,8 +17,7 @@ project(mola_yaml LANGUAGES CXX)
 find_package(mola_common REQUIRED)
 
 # find dependencies:
-find_package(mrpt_containers REQUIRED)
-find_package(mrpt_system REQUIRED)
+find_package(MRPT 2.1.0 REQUIRED COMPONENTS containers system)
 
 # define lib:
 file(GLOB_RECURSE LIB_SRCS src/*.cpp src/*.h)
@@ -32,13 +31,13 @@ mola_add_library(
   TARGET ${PROJECT_NAME}
   SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
   PUBLIC_LINK_LIBRARIES
-    mrpt::mrpt_containers
+    mrpt::containers
   PRIVATE_LINK_LIBRARIES
-    mrpt::mrpt_system
+    mrpt::system
     CXX::Filesystem  # the C++>=17 std lib
   CMAKE_DEPENDENCIES
-    mrpt_containers
-    mrpt_system
+    mrpt-containers
+    mrpt-system
 )
 
 # -----------------------

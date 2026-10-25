@@ -17,8 +17,8 @@ project(mola_pose_list LANGUAGES CXX)
 find_package(mola_common REQUIRED)
 
 # find CMake dependencies:
-find_package(mrpt_maps REQUIRED)
-find_package(mrpt_poses REQUIRED)
+find_package(mrpt-maps)
+find_package(mrpt-poses)
 
 # -----------------------
 # define lib:
@@ -29,12 +29,12 @@ mola_add_library(
   TARGET ${PROJECT_NAME}
   SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
   PUBLIC_LINK_LIBRARIES
-    mrpt::mrpt_maps
-    mrpt::mrpt_poses
+    mrpt::maps
+    mrpt::poses
   CMAKE_DEPENDENCIES
     mola_common
-    mrpt_maps
-    mrpt_poses
+    mrpt-maps
+    mrpt-poses
 )
 
 # -----------------------

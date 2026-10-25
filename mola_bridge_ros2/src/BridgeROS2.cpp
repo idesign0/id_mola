@@ -762,8 +762,7 @@ std::optional<mola::TransformTree> BridgeROS2::transform_tree(
 }
 
 bool BridgeROS2::waitForTransform(
-    mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame,
-    mrpt::Clock::time_point* stamp)
+    mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame)
 {
   try
   {
@@ -773,10 +772,6 @@ bool BridgeROS2::waitForTransform(
     tf2::Transform tf;
     tf2::fromMsg(ref_to_trgFrame.transform, tf);
     des = mrpt::ros2bridge::fromROS(tf);
-    if (stamp)
-    {
-      *stamp = mrpt::ros2bridge::fromROS(ref_to_trgFrame.header.stamp);
-    }
 
     MRPT_LOG_DEBUG_FMT(
         "[waitForTransform] Found pose %s -> %s: %s", referenceFrame.c_str(), frame.c_str(),
@@ -857,11 +852,9 @@ void BridgeROS2::importRosOdometryToMOLA()
   }
 
   // Get pose from tf:
-  mrpt::poses::CPose3D    odomPose;
-  mrpt::Clock::time_point odomStamp;
+  mrpt::poses::CPose3D odomPose;
 
-  bool odom_tf_ok =
-      waitForTransform(odomPose, params_.base_link_frame, params_.odom_frame, &odomStamp);
+  bool odom_tf_ok = waitForTransform(odomPose, params_.base_link_frame, params_.odom_frame);
   if (!odom_tf_ok)
   {
     MRPT_LOG_THROTTLE_WARN_FMT(
@@ -872,9 +865,11 @@ void BridgeROS2::importRosOdometryToMOLA()
     return;
   }
 
+  const auto now = rclcpp::Time();  // last one.
+
   auto obs         = mrpt::obs::CObservationOdometry::Create();
   obs->sensorLabel = "odom";
-  obs->timestamp   = odomStamp;
+  obs->timestamp   = mrpt::ros2bridge::fromROS(now);
   obs->odometry    = mrpt::poses::CPose2D(odomPose);
 
   sendObservationsToFrontEnds(obs);
@@ -918,7 +913,6 @@ void BridgeROS2::callbackOnLaserScan(
 
   auto obs = mrpt::obs::CObservation2DRangeScan::Create();
   mrpt::ros2bridge::fromROS(o, sensorPose, *obs);
-  obs->timestamp = mrpt::ros2bridge::fromROS(o.header.stamp);
 
   obs->sensorLabel = outSensorLabel;
 
@@ -965,9 +959,6 @@ void BridgeROS2::callbackOnImu(
   auto obs = mrpt::obs::CObservationIMU::Create();
   mrpt::ros2bridge::fromROS(o, *obs);
 
-  // Set explicitly, since fromROS(Imu) may not do it (depending on the
-  // mrpt_ros_bridge version), leaving the default wall-clock "now()":
-  obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
   obs->sensorPose  = sensorPose;
   obs->sensorLabel = outSensorLabel;
 
@@ -1014,7 +1005,6 @@ void BridgeROS2::callbackOnNavSatFix(
   auto obs = mrpt::obs::CObservationGPS::Create();
   mrpt::ros2bridge::fromROS(o, *obs);
 
-  obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
   obs->sensorPose  = sensorPose;
   obs->sensorLabel = outSensorLabel;
 
@@ -1066,7 +1056,6 @@ void BridgeROS2::callbackOnGpsMsg(
   THROW_EXCEPTION("Using gps_msgs requires mrpt_ros_bridge>=3.3.0");
 #endif
 
-  obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
   obs->sensorPose  = sensorPose;
   obs->sensorLabel = outSensorLabel;
 
@@ -1133,7 +1122,8 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationImage& obs)
   const std::string sSensorFrameId = obs.sensorLabel;
 
   // Send TF:
-  const mrpt::poses::CPose3D sensorPose = obs.getSensorPose();
+  mrpt::poses::CPose3D sensorPose;
+  obs.getSensorPose(sensorPose);
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
@@ -1175,7 +1165,8 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservation2DRangeScan& obs)
   const std::string sSensorFrameId = obs.sensorLabel;
 
   // Send TF:
-  const mrpt::poses::CPose3D sensorPose = obs.getSensorPose();
+  mrpt::poses::CPose3D sensorPose;
+  obs.getSensorPose(sensorPose);
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
@@ -1338,7 +1329,8 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationGPS& obs)
   const std::string sSensorFrameId = obs.sensorLabel;
 
   // Send TF:
-  const mrpt::poses::CPose3D sensorPose = obs.getSensorPose();
+  mrpt::poses::CPose3D sensorPose;
+  obs.getSensorPose(sensorPose);
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
@@ -1379,7 +1371,8 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationIMU& obs)
   const std::string sSensorFrameId = obs.sensorLabel;
 
   // Send TF:
-  const mrpt::poses::CPose3D sensorPose = obs.getSensorPose();
+  mrpt::poses::CPose3D sensorPose;
+  obs.getSensorPose(sensorPose);
 
   if (tf_bc_)
   {
@@ -1566,16 +1559,14 @@ void BridgeROS2::service_relocalize_from_se(
     std::shared_ptr<mola_msgs::srv::RelocalizeFromStateEstimator::Response>
         response)  // NOLINT(performance-unnecessary-value-param)
 {
-  // This service only exists once a Relocalization module has been found, so
-  // there is nothing to discover here (see relocalizationModules()).
-  const auto relocModules = relocalizationModules(false);
-  if (relocModules.empty())
+  auto lck = mrpt::lockHelper(rosPubsMtx_);
+  if (molaSubs_.relocalization.empty())
   {
     response->accepted = false;
     return;
   }
 
-  for (const auto& m : relocModules)
+  for (const auto& m : molaSubs_.relocalization)
   {
     m->relocalize_from_gnss();
   }
@@ -1588,8 +1579,8 @@ void BridgeROS2::service_relocalize_near_pose(
     std::shared_ptr<mola_msgs::srv::RelocalizeNearPose::Response>
         response)  // NOLINT(performance-unnecessary-value-param)
 {
-  const auto relocModules = relocalizationModules(false);
-  if (relocModules.empty())
+  auto lck = mrpt::lockHelper(rosPubsMtx_);
+  if (molaSubs_.relocalization.empty())
   {
     response->accepted = false;
     return;
@@ -1602,7 +1593,7 @@ void BridgeROS2::service_relocalize_near_pose(
     return;
   }
 
-  for (const auto& m : relocModules)
+  for (const auto& m : molaSubs_.relocalization)
   {
     m->relocalize_near_pose_pdf(p);
   }
@@ -1612,18 +1603,7 @@ void BridgeROS2::service_relocalize_near_pose(
 
 void BridgeROS2::callbackOnRelocalizeTopic(const geometry_msgs::msg::PoseWithCovarianceStamped& o)
 {
-  // Unlike the services, this subscription exists from start-up, so a request
-  // may well arrive before any Relocalization module has been discovered:
-  const auto relocModules = relocalizationModules(true);
-  if (relocModules.empty())
-  {
-    MRPT_LOG_THROTTLE_WARN_FMT(
-        5.0,
-        "Ignoring relocalization request on topic '%s': no running MOLA module implements "
-        "mola::Relocalization.",
-        params_.relocalize_from_topic.c_str());
-    return;
-  }
+  auto lck = mrpt::lockHelper(rosPubsMtx_);
 
   mrpt::poses::CPose3DPDFGaussian p;
   if (!relocalizationPoseInReferenceFrame(o, p))
@@ -1634,51 +1614,10 @@ void BridgeROS2::callbackOnRelocalizeTopic(const geometry_msgs::msg::PoseWithCov
     return;
   }
 
-  for (const auto& m : relocModules)
+  for (const auto& m : molaSubs_.relocalization)
   {
     m->relocalize_near_pose_pdf(p);
   }
-}
-
-std::set<std::shared_ptr<mola::Relocalization>> BridgeROS2::relocalizationModules(
-    bool discoverIfEmpty)
-{
-  {
-    auto lck = mrpt::lockHelper(molaSubsMtx_);
-    if (!molaSubs_.relocalization.empty() || !discoverIfEmpty)
-    {
-      return molaSubs_.relocalization;
-    }
-  }
-
-  // Nothing known yet: the periodic scan may not have run since the modules
-  // were created. Scan now so that an early request is served instead of
-  // silently dropped, but no more often than period_check_new_mola_subs:
-  // while no module implements the interface, every incoming message would
-  // otherwise trigger a full scan. The compare-exchange also coalesces
-  // concurrent callers into a single scan.
-  const double tNow  = mrpt::Clock::nowDouble();
-  double       tLast = lastOnDemandMolaSubsScan_.load();
-  if (tNow - tLast > params_.period_check_new_mola_subs &&
-      lastOnDemandMolaSubsScan_.compare_exchange_strong(tLast, tNow))
-  {
-    doLookForNewMolaSubs();
-  }
-
-  auto lck = mrpt::lockHelper(molaSubsMtx_);
-  return molaSubs_.relocalization;
-}
-
-std::shared_ptr<mola::MapServer> BridgeROS2::firstMapServer()
-{
-  auto lck = mrpt::lockHelper(molaSubsMtx_);
-  if (molaSubs_.mapServers.empty())
-  {
-    return {};
-  }
-  // Returned by value: map_load()/map_save() may take a long time and must not
-  // hold molaSubsMtx_, which the periodic module scan also needs.
-  return *molaSubs_.mapServers.begin();
 }
 
 bool BridgeROS2::relocalizationPoseInReferenceFrame(
@@ -1711,8 +1650,8 @@ void BridgeROS2::service_map_load(
     std::shared_ptr<mola_msgs::srv::MapLoad::Response>
         response)  // NOLINT(performance-unnecessary-value-param)
 {
-  const auto m = firstMapServer();
-  if (!m)
+  auto lck = mrpt::lockHelper(rosPubsMtx_);
+  if (molaSubs_.mapServers.empty())
   {
     response->success       = false;
     response->error_message = "No MOLA module with MapServer interface is running.";
@@ -1720,6 +1659,8 @@ void BridgeROS2::service_map_load(
     return;
   }
 
+  const auto& m = *molaSubs_.mapServers.begin();
+  ASSERT_(m);
   const auto& r = m->map_load(request->map_path);
 
   response->success       = r.success;
@@ -1732,8 +1673,8 @@ void BridgeROS2::service_map_save(
     std::shared_ptr<mola_msgs::srv::MapSave::Response>
         response)  // NOLINT(performance-unnecessary-value-param)
 {
-  const auto m = firstMapServer();
-  if (!m)
+  auto lck = mrpt::lockHelper(rosPubsMtx_);
+  if (molaSubs_.mapServers.empty())
   {
     response->success       = false;
     response->error_message = "No MOLA module with MapServer interface is running.";
@@ -1741,6 +1682,8 @@ void BridgeROS2::service_map_save(
     return;
   }
 
+  const auto& m = *molaSubs_.mapServers.begin();
+  ASSERT_(m);
   const auto& r = m->map_save(request->map_path);
 
   response->success       = r.success;
@@ -2220,8 +2163,7 @@ void BridgeROS2::timerPubMapLayer(const std::string& layerName, const MapSourceB
   // Is it a CVoxelMap?
   else if (auto vox = std::dynamic_pointer_cast<const mrpt::maps::CVoxelMap>(mu.map); vox)
   {
-    mrpt::maps::CSimplePointsMap::Ptr pm =
-        std::const_pointer_cast<mrpt::maps::CSimplePointsMap>(vox->getOccupiedVoxels());
+    mrpt::maps::CSimplePointsMap::Ptr pm = vox->getOccupiedVoxels();
     if (pm)
     {
       mrpt::obs::CObservationPointCloud obs;
@@ -2239,11 +2181,8 @@ void BridgeROS2::timerPubMapLayer(const std::string& layerName, const MapSourceB
   // Not empty?
   else if (mu.map)
   {
-    // Try to publish it via its points-map representation. MRPT retired
-    // CMetricMap::getAsSimplePointsMap() in favour of the free function
-    // mrpt::maps::asPointsMap(), which answers for any points map rather than
-    // only for CSimplePointsMap.
-    const auto* pts = mrpt::maps::asPointsMap(*mu.map);
+    // Try to publish it via it's simple pointsmap representation:
+    const auto* pts = mu.map->getAsSimplePointsMap();
     if (pts == nullptr)
     {
       MRPT_LOG_WARN_STREAM(
@@ -2254,12 +2193,8 @@ void BridgeROS2::timerPubMapLayer(const std::string& layerName, const MapSourceB
     {
       mrpt::obs::CObservationPointCloud obs;
       obs.sensorLabel = mapTopic;
-      // The view may be any CPointsMap, so copy through insertAnotherMap()
-      // rather than through a CSimplePointsMap copy constructor.
-      auto cloud = std::make_shared<mrpt::maps::CSimplePointsMap>();
-      cloud->insertAnotherMap(pts, mrpt::poses::CPose3D::Identity());
-      obs.pointcloud = cloud;
-      obs.timestamp  = mu.timestamp;
+      obs.pointcloud  = std::make_shared<mrpt::maps::CSimplePointsMap>(*pts);
+      obs.timestamp   = mu.timestamp;
       // Reuse code for point cloud observations: build a "fake" observation:
       internalOn(obs, false /*no tf*/, mu.reference_frame);
     }

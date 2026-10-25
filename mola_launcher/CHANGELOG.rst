@@ -2,27 +2,6 @@
 Changelog for package mola_launcher
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-
-3.3.1 (2026-10-05)
-------------------
-* Dataset_UI: do not warn about execution_rate for sources that replay at their own pace
-* Restart the rate window while its check is skipped
-* Contributors: Jose Luis Blanco-Claraco
-
-3.3.0 (2026-09-23)
-------------------
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* mola-cli: only warn on sustained execution rate losses (`#219 <https://github.com/MOLAorg/mola/issues/219>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-* FIX: mola-cli ignored SIGTERM and never exited (`#215 <https://github.com/MOLAorg/mola/issues/215>`_)
-  All x86_64 checks pass (humble/jazzy stable+testing, build-docs, clang-format, CLA), CodeRabbit review completed. arm64 checks have been stuck in queued state with nothing ahead of them in the queue since the PR was opened - the self-hosted Jetson runner is offline, not busy (confirmed: no in-progress or other queued runs on this repo). Infra unavailability, not a PR issue.
-* Contributors: Jose Luis Blanco-Claraco
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge remote-tracking branch 'origin/feat/map-frame-gauge-change' into feat/map-frame-gauge-change

@@ -20,7 +20,7 @@
 #include <mola_metric_maps/SparseVoxelPointCloud.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
 #include <mrpt/obs/stock_observations.h>
-#include <mrpt/viz/Scene.h>
+#include <mrpt/opengl/Scene.h>
 
 #include <iostream>
 
@@ -45,7 +45,7 @@ void test_voxelmap_insert_2d_scan()
 
   map.insertObservation(scan2D);
 #if 0
-    mrpt::viz::Scene scene;
+    mrpt::opengl::Scene scene;
     map.renderOptions.show_inner_grid_boxes = true;
     map.renderOptions.show_mean_only        = true;
     map.renderOptions.point_size            = 5.0f;

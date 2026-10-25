@@ -18,7 +18,6 @@ local sectionName = argArray[4]
 
 if sectionName then
 }
-
 $(getTitle(sectionName, 3))
 
 %{

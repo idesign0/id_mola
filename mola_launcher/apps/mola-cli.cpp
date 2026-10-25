@@ -23,10 +23,8 @@
 #include <mrpt/core/exceptions.h>
 #include <mrpt/rtti/CObject.h>
 #include <mrpt/system/filesystem.h>
-#include <unistd.h>  // write()
 
 #include <CLI/CLI.hpp>
-#include <atomic>
 #include <csignal>  // sigaction
 #include <iostream>
 #include <optional>
@@ -40,20 +38,14 @@
 
 namespace
 {
-std::atomic<mola::MolaLauncherApp*> theApp = nullptr;
+mola::MolaLauncherApp* theApp = nullptr;
 
-void mola_signal_handler([[maybe_unused]] int s)
+void mola_signal_handler(int s)
 {
-  // Only async-signal-safe operations are allowed here: an atomic store and a
-  // raw write() to stderr. The actual shutdown (which logs, sleeps and joins
-  // threads) is done by the main thread as soon as spin() returns.
-  static const char           msg[] = "\nTermination signal caught. Shutting down...\n";
-  [[maybe_unused]] const auto n     = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
-
-  if (auto* app = theApp.load())
-  {
-    app->requestSpinExit();
-  }
+  std::cerr << "Caught signal " << s << ". Shutting down..."
+            << "\n";
+  if (theApp) theApp->shutdown();
+  // exit(0);
 }
 
 void mola_install_signal_handler()
@@ -65,12 +57,6 @@ void mola_install_signal_handler()
   sigIntHandler.sa_flags = 0;
 
   sigaction(SIGINT, &sigIntHandler, nullptr);
-  // SIGTERM too: it is what process supervisors (systemd, containers, `timeout`,
-  // plain `kill`) send to request a shutdown. Without this, rclcpp's own handler
-  // would be the only one to run: it stops the ROS node from being spun, while
-  // the main MOLA loop keeps running, so the process never exits and lingers
-  // with its ROS 2 endpoints still advertised but no longer served.
-  sigaction(SIGTERM, &sigIntHandler, nullptr);
 }
 
 // Default task for mola-cli: launching a SLAM system
@@ -122,10 +108,6 @@ int mola_cli_launch_slam(
 
   // Run it:
   app.spin();
-
-  // spin() may have ended because of the signal handler above, which is only
-  // allowed to raise a flag: do the actual shutdown here, in a regular thread.
-  app.shutdown();
 
   return 0;
 }

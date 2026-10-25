@@ -9,24 +9,13 @@
   :caption: Get started
 
   Home <index.html#http://>
-  quickstart
   why-mola
-  your-own-rosbag
-  gui-vs-cli
   building-maps
   localization
   geo-referencing
   ros2api
   mola_ros2_configurations
   map-tools
-  troubleshooting
-
-.. toctree::
-  :maxdepth: 1
-  :hidden:
-  :caption: Datasets
-
-  datasets/index
 
 .. toctree::
   :maxdepth: 2
@@ -44,7 +33,6 @@
   mola_lidar_odometry
   mola_lo_apps
   mola_lo_pipelines
-  mola_lo_diagnostics
   wrappers_3rd_party
 
 .. toctree::
@@ -89,10 +77,6 @@
   doxygen-index
   bibliography
 
-
-=====================================================
-MOLA: LiDAR Odometry, SLAM and Localization
-=====================================================
 
 .. raw:: html
 
@@ -243,72 +227,83 @@ Quick links
 .. humble badges ------
 
 .. |badgeHrel| image:: https://img.shields.io/ros/v/humble/mola
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola
 
 .. |badgeHrel_LO| image:: https://img.shields.io/ros/v/humble/mola_lidar_odometry
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
 
 .. |badgeHrel_MP| image:: https://img.shields.io/ros/v/humble/mp2p_icp
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
 
 .. |badgeHrel_SE| image:: https://img.shields.io/ros/v/humble/mola_state_estimation
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
+
+.. iron badges ------
+
+.. |badgeIrel| image:: https://img.shields.io/ros/v/iron/mola
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/?search_packages=true&pkgs=mola
+
+.. |badgeIrel_LO| image:: https://img.shields.io/ros/v/iron/mola_lidar_odometry
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
+
+.. |badgeIrel_MP| image:: https://img.shields.io/ros/v/iron/mp2p_icp
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
 
 .. jazzy badges ------
 
 .. |badgeJrel| image:: https://img.shields.io/ros/v/jazzy/mola
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola
 
 .. |badgeJrel_LO| image:: https://img.shields.io/ros/v/jazzy/mola_lidar_odometry
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
 
 .. |badgeJrel_MP| image:: https://img.shields.io/ros/v/jazzy/mp2p_icp
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
 
 .. |badgeJrel_SE| image:: https://img.shields.io/ros/v/jazzy/mola_state_estimation
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
-
-.. lyrical badges ------
-
-.. |badgeLrel| image:: https://img.shields.io/ros/v/lyrical/mola
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola
-
-.. |badgeLrel_LO| image:: https://img.shields.io/ros/v/lyrical/mola_lidar_odometry
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
-
-.. |badgeLrel_MP| image:: https://img.shields.io/ros/v/lyrical/mp2p_icp
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
-
-.. |badgeLrel_SE| image:: https://img.shields.io/ros/v/lyrical/mola_state_estimation
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
 
 .. rolling badges ------
 
 .. |badgeRrel| image:: https://img.shields.io/ros/v/rolling/mola
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola
 
 .. |badgeRrel_LO| image:: https://img.shields.io/ros/v/rolling/mola_lidar_odometry
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
 
 .. |badgeRrel_MP| image:: https://img.shields.io/ros/v/rolling/mp2p_icp
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
 
 .. |badgeRrel_SE| image:: https://img.shields.io/ros/v/rolling/mola_state_estimation
+   :scale: 100%
    :align: middle
    :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
 
@@ -364,18 +359,22 @@ How to install all MOLA modules:
 
     These are the **versions available** from ROS build farms for each main MOLA component:
 
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | Repository           | ROS 2 Humble       | ROS 2 Jazzy    | ROS 2 Lyrical  | ROS 2 Rolling  |
-    |                      | (u22.04)           | (u24.04)       | (u26.04)       | (u24.04)       |
-    +======================+====================+================+================+================+
-    | MOLA                 | |badgeHrel|        | |badgeJrel|    | |badgeLrel|    | |badgeRrel|    |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mola_lidar_odometry  | |badgeHrel_LO|     | |badgeJrel_LO| | |badgeLrel_LO| | |badgeRrel_LO| |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mola_state_estimation| |badgeHrel_SE|     | |badgeJrel_SE| | |badgeLrel_SE| | |badgeRrel_SE| |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mp2p_icp             | |badgeHrel_MP|     | |badgeJrel_MP| | |badgeLrel_MP| | |badgeRrel_MP| |
-    +----------------------+--------------------+----------------+----------------+----------------+
+    +----------------------+--------------------+----------------+----------------+
+    | Repository           | ROS 2 Humble       | ROS 2 Jazzy    | ROS 2 Rolling  |
+    |                      |  (u22.04)          |   (u24.04)     |    (u24.04)    |
+    +======================+====================+================+================+
+    | MOLA                 | |badgeHrel|        | |badgeJrel|    | |badgeRrel|    |
+    +----------------------+--------------------+----------------+----------------+
+    | mola_lidar_odometry  | |badgeHrel_LO|     | |badgeJrel_LO| | |badgeRrel_LO| |
+    +----------------------+--------------------+----------------+----------------+
+    | mola_state_estimation| |badgeHrel_SE|     | |badgeJrel_SE| | |badgeRrel_SE| |
+    +----------------------+--------------------+----------------+----------------+
+    | mp2p_icp             | |badgeHrel_MP|     | |badgeJrel_MP| | |badgeRrel_MP| |
+    +----------------------+--------------------+----------------+----------------+
+
+    EOL ROS distribution:
+
+     - ROS 2 Iron (u22.04): MOLA |badgeIrel|, mola_lidar_odometry |badgeIrel_LO|, mp2p_icp |badgeIrel_MP|
 
 
 .. dropdown:: Build from sources

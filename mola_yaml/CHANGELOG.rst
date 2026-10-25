@@ -2,22 +2,6 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-
-3.3.1 (2026-10-05)
-------------------
-
-3.3.0 (2026-09-23)
-------------------
-* Expand variables in $import/$include paths even with doEnvVars off (`#227 <https://github.com/MOLAorg/mola/issues/227>`_)
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* Don't call .as<std::string>() on a null scalar
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge remote-tracking branch 'origin/feat/map-frame-gauge-change' into feat/map-frame-gauge-change

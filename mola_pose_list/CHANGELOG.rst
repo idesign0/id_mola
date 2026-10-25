@@ -2,21 +2,6 @@
 Changelog for package mola_pose_list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.3.2 (2026-10-09)
-------------------
-
-3.3.1 (2026-10-05)
-------------------
-
-3.3.0 (2026-09-23)
-------------------
-* Port to MRPT 3.x (`#220 <https://github.com/MOLAorg/mola/issues/220>`_)
-* findNearby() returns the matches, and the search uses the kd-tree (`#218 <https://github.com/MOLAorg/mola/issues/218>`_)
-* Contributors: Jose Luis Blanco-Claraco
-
-3.2.1 (2026-09-15)
-------------------
-
 3.2.0 (2026-08-21)
 ------------------
 * Merge pull request `#192 <https://github.com/MOLAorg/mola/issues/192>`_ from MOLAorg/feat/map-frame-gauge-change

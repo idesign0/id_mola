@@ -335,7 +335,7 @@ class HashedVoxelPointCloud : public mrpt::maps::CMetricMap,
   /** Returns a short description of the map. */
   std::string asString() const override;
 
-  void getVisualizationInto(mrpt::viz::CSetOfObjects& outObj) const override;
+  void getVisualizationInto(mrpt::opengl::CSetOfObjects& outObj) const override;
 
   /** Returns true if the map is empty */
   bool isEmpty() const override;
@@ -348,15 +348,7 @@ class HashedVoxelPointCloud : public mrpt::maps::CMetricMap,
 
   /// Returns a cached point cloud view of the hash map.
   /// Not efficient at all. Only for MOLA->ROS2 bridge.
-  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const;
-
-#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
-  /// Makes the contents above reachable via mrpt::maps::asPointsMap().
-  [[nodiscard]] const mrpt::maps::CPointsMap* asPointsMapView() const override
-  {
-    return getAsSimplePointsMap();
-  }
-#endif
+  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const override;
 
   /** @} */
 

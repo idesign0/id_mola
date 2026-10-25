@@ -7,9 +7,9 @@
 # Released under GNU GPL v3. See LICENSE file
 # ------------------------------------------------------------------------------
 
-find_package(mrpt_core REQUIRED)
+find_package(mrpt-core)
 find_package(CLI11 REQUIRED)
-find_package(mrpt_containers REQUIRED)
+find_package(mrpt-containers)
 
 mola_add_executable(
   TARGET  mola-cli
@@ -17,7 +17,7 @@ mola_add_executable(
   LINK_LIBRARIES
     mola::mola_launcher
     mola::mola_kernel
-    mrpt::mrpt_core
+    mrpt::core
     CLI11::CLI11
 )
 
@@ -35,5 +35,5 @@ mola_add_executable(
   LINK_LIBRARIES
     mola::mola_kernel
     CLI11::CLI11
-    mrpt::mrpt_containers
+    mrpt::containers
 )
